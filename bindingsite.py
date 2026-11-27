@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-bindingsite -- one-command binding-site figures for PyMOL
-==========================================================
+bindingsite: binding-site figures in one PyMOL command
+======================================================
 
 Turns a protein-ligand complex into a finished binding-site view: the ligand,
 the residues that matter, colour-coded non-covalent interactions, readable
@@ -10,12 +10,12 @@ residue labels that do not overlap, and a camera that looks into the pocket.
     PyMOL> bindingsite                    # find the ligand, do everything
     PyMOL> bindingsite resn STI           # ... for a ligand you name
     PyMOL> bindingsite_report             # table of what was found
-    PyMOL> bindingsite_png site.png       # ray-traced figure, labels scaled
+    PyMOL> bindingsite_png site.png       # ray-traced figure, framed for the picture
 
 It needs nothing but PyMOL and numpy.  The chemistry (donors, acceptors,
 charges, aromatic rings, electrophiles) is perceived from geometry, so it also
-works on heavy-atom-only files without bond orders -- crystal structures,
-Boltz/AlphaFold-style co-folds, docking poses.
+works on heavy-atom-only files without bond orders, such as crystal structures,
+Boltz/AlphaFold-style co-folds and docking poses.
 
 Install:  Plugin > Plugin Manager > Install New Plugin > Choose file...
           (or add `run /path/to/bindingsite.py` to your pymolrc)
@@ -29,6 +29,7 @@ Copyright (c) 2026 Michele Bonus.  Released under the MIT License.
 
 from __future__ import print_function
 
+import contextlib
 import math
 import os
 import re
@@ -37,7 +38,7 @@ from collections import OrderedDict, defaultdict
 import numpy as np
 from pymol import cmd, CmdException
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 # =============================================================================
 #  Tunable detection thresholds.  Change at runtime, e.g. from the PyMOL prompt:
@@ -755,7 +756,7 @@ def _perceive_generic(C, idxs, has_h):
         if ok:
             carbonyl[i] = o
     def acyl_c(j):
-        """A carbonyl carbon -- also the C=O of a neighbouring standard residue."""
+        """A carbonyl carbon, including the C=O of a neighbouring standard residue."""
         if j in carbonyl:
             return True
         return (j not in members and atoms[j].elem == "C"
@@ -1250,7 +1251,7 @@ def _detect(C, lig, env, wanted=None):
                     continue
                 cands.append((dist, n, o, ang, n_lig))
                 implied[(n, o)] = True
-    # nearest first -- but a water never takes a slot a protein atom could fill
+    # nearest first, but a water never takes a slot a protein atom could fill
     cands.sort(key=lambda c: (c[1] in C.waters or c[2] in C.waters, c[0]))
     don_used, acc_used, seen = defaultdict(int), defaultdict(int), set()
     hbonds = []
@@ -1710,7 +1711,7 @@ def _analyse(lig_sel, recv_sel, state, opts):
     for i, j, d in spurious:
         a, b = (atoms[i], atoms[j]) if atoms[i].lig else (atoms[j], atoms[i])
         if len(spurious) <= 3:
-            C.notes.append("PyMOL had guessed a bond between ligand %s and %s%s %s (%.2f A) -- not a "
+            C.notes.append("PyMOL had guessed a bond between ligand %s and %s%s %s (%.2f A), which is not a "
                            "plausible bond length: treated as a contact%s."
                            % (a.name, b.resn, b.resi, b.name, d, done))
         if opts["fix_bonds"]:
@@ -1729,7 +1730,7 @@ def _analyse(lig_sel, recv_sel, state, opts):
     overlaps = [r["dist"] for r in inter if r["type"] == "clash" and r["dist"] < 1.3]
     if len(overlaps) >= 2:
         C.notes.append("the ligand sits ON TOP of protein atoms (%d contacts below 1.3 A, closest "
-                       "%.2f A). The coordinates were probably mis-read -- e.g. a PDB file with a "
+                       "%.2f A). The coordinates were probably mis-read, e.g. from a PDB file with a "
                        "4-letter residue name; load the mmCIF instead." % (len(overlaps), min(overlaps)))
     wanted = opts["types"]
     inter = [r for r in inter if r["type"] in wanted or r["type"] == "water"]
@@ -2283,7 +2284,7 @@ def _for_this_view(site, fit=True):
 #  drawing
 # =============================================================================
 def _site_names(name):
-    """Every object and selection a site called `name` can own -- and nothing else."""
+    """Every object and selection a site called `name` can own, and nothing else."""
     order = list(ITYPES) + ["centers", "surface", "labels_lining", "labels", "leaders",
                             "leader_ends", "legend"]
     names = ["%s.%s" % (name, suffix) for suffix in order]
@@ -2584,7 +2585,7 @@ def _print_report(site):
               % (site["opts"]["radius"], ", ".join(near)))
     n_clash = sum(1 for r in rows if r["type"] == ITYPES["clash"]["label"])
     if n_clash:
-        print("   WARNING: %d steric clash%s between ligand and pocket -- check this pose."
+        print("   WARNING: %d steric clash%s between ligand and pocket: check this pose."
               % (n_clash, "" if n_clash == 1 else "es"))
     for note in site["chem"].notes:
         print("   note: " + note)
@@ -2605,9 +2606,9 @@ def bindingsite(ligand="auto", receptor="auto", radius=4.0, style="publication",
     """
 DESCRIPTION
 
-    Build a publication-quality binding-site view: ligand, pocket residues,
-    colour-coded interactions, non-overlapping residue labels and a camera
-    that looks into the pocket.
+    Draw a finished binding-site view: ligand, pocket residues, colour-coded
+    interactions, residue labels that do not overlap and a camera that looks
+    into the pocket.
 
 USAGE
 
@@ -2620,7 +2621,7 @@ ARGUMENTS
     receptor = everything the ligand may interact with.  Default: the rest of
              the ligand's own object (protein, waters, ions, cofactors), so
              that other complexes loaded alongside stay out of the picture.
-             A ligand that is alone in its object -- docking poses -- takes
+             A ligand that is alone in its object (docking poses) takes
              the other enabled objects instead.
     radius = also show residues within this distance of the ligand that make
              no specific contact, as thin sticks {default: 4.0}
@@ -2673,8 +2674,8 @@ NOTES
     electrophilic warheads are perceived from geometry; where the file has
     explicit hydrogens they are used instead.  Amines, amidines and guanidines
     are taken as protonated, carboxylates/phosphates/sulfonates/tetrazoles as
-    deprotonated.  Steric clashes are reported rather than hidden: a pose that
-    clashes should not make a pretty picture without a warning.
+    deprotonated.  Steric clashes are drawn and reported, so that a pose that
+    clashes does not pass unnoticed.
 
     Labels, the colour key and the cut-aways are laid out for the camera at
     the time of the call.  After rotating, run  bindingsite_relabel .
@@ -2735,7 +2736,7 @@ SEE ALSO
         ours = name in _SITES or name + "_ligand" in cmd.get_names("selections")
         if cmd.get_type(name) != "object:group" or not ours:
             raise CmdException("bindingsite: '%s' is already the name of an object, selection or group "
-                               "in this session -- pass another name=" % name)
+                               "in this session; pass another name=" % name)
     state = int(state)
     opts = dict(radius=float(radius), style=style, labels=_truthy(labels), distances=_truthy(distances),
                 surface=surface, lining=_truthy(lining),
@@ -2783,7 +2784,7 @@ SEE ALSO
         _print_report(site)
         real = [c for c in others if c["kind"] in ("ligand", "peptide")]
         if real:
-            print(" bindingsite: %d more ligand%s here -- e.g.  bindingsite %s"
+            print(" bindingsite: %d more ligand%s here, e.g.  bindingsite %s"
                   % (len(real), "" if len(real) == 1 else "s", real[0]["pretty"]))
     return site
 
@@ -2889,14 +2890,183 @@ USAGE
     print(" bindingsite: view %d of %d" % (k + 1, len(views)))
 
 
+# =============================================================================
+#  pictures larger than the window
+# =============================================================================
+# PyMOL's ray-tracer enlarges labels sized in pixels when the picture is larger
+# than the window, but not labels sized in Angstrom: TextRenderRay() multiplies
+# by the magnification only where label_size >= 0 (the same in PyMOL 2.5, 3.1
+# and the current source).  The labels drawn here are sized in Angstrom, so that
+# they keep their proportions when the view is zoomed.  Left alone they are
+# traced at their on-screen pixel size, which on a 4000-pixel picture is too
+# small to read.  Their size is therefore corrected while a picture is traced:
+# by bindingsite_png, and by PyMOL's own `ray` and `png`, which are wrapped
+# below for this purpose alone.
+_STOCK = {}                 # PyMOL's own ray and png
+_tracing = []               # not empty while a corrected picture is being traced
+
+
+def _angstrom_labels(everything=False):
+    """(object, label_size) of the objects labelled in Angstrom.
+
+    Only those of binding-site scenes, recognised by name so that a reloaded
+    session works too; with `everything`, any object with a size of its own
+    and the global setting ("") as well.
+    """
+    found = []
+    ours = set(ITYPES) | {"labels", "labels_lining"}
+    try:
+        common = float(cmd.get("label_size"))
+    except Exception:
+        common = 0.0
+    if everything and common < 0:
+        found.append(("", common))
+    for obj in cmd.get_names("objects"):
+        base, _, suffix = obj.rpartition(".")
+        mine = bool(base) and suffix in ours
+        if not (mine or everything):
+            continue
+        try:
+            size = float(cmd.get("label_size", obj))
+        except Exception:
+            continue
+        if size < 0 and (mine or abs(size - common) > 1e-6):
+            found.append((obj, size))
+    return found
+
+
+@contextlib.contextmanager
+def _labels_for_picture(height, everything=False):
+    """Size the Angstrom labels for a ray-traced picture `height` pixels high."""
+    touched, scale = [], 1.0
+    if not _tracing:
+        scale = float(height) / float(cmd.get_viewport()[1])
+        if abs(scale - 1.0) > 1e-6:
+            touched = _angstrom_labels(everything)
+    _tracing.append(height)
+    try:
+        # updates=0 on the way in and out: the tracer reads the size as it runs,
+        # and nothing on screen is invalidated, so the picture that `ray` leaves
+        # in the window is still there for a following `png`.
+        for obj, size in touched:
+            cmd.set("label_size", size * scale, obj, updates=0, quiet=1)
+        yield
+    finally:
+        for obj, size in touched:
+            cmd.set("label_size", size, obj, updates=0, quiet=1)
+        _tracing.pop()
+
+
+def _pixels(value, dpi):
+    """A `png` size in pixels; PyMOL also takes `10cm`, `4in` or `80mm` with a dpi."""
+    text = str(value).strip().lower()
+    m = re.match(r"^([0-9.]+)\s*(in|mm|cm)$", text)
+    if not m:
+        return int(float(text))
+    dpi = float(dpi)
+    if dpi < 0:
+        dpi = float(cmd.get("image_dots_per_inch"))
+    return int(float(m.group(1)) * dpi / {"in": 1.0, "mm": 25.4, "cm": 2.54}[m.group(2)] + 0.5)
+
+
+def _to_correct(width, height):
+    """(width, height) of a picture whose labels need correcting, else None."""
+    try:
+        if _tracing:
+            return None
+        vw, vh = cmd.get_viewport()
+        w, h = max(0, int(width)), max(0, int(height))
+        if not (w or h):
+            return None
+        h = h or (w * vh) // vw         # a missing side follows the window, as in PyMOL
+        w = w or (h * vw) // vh
+        if h == vh or not _angstrom_labels():
+            return None
+        return w, h
+    except Exception:
+        return None
+
+
+def _sides_cut(size, quiet):
+    """PyMOL keeps the height of the view; a narrower picture loses its sides."""
+    try:
+        vw, vh = cmd.get_viewport()
+        if not int(quiet) and size[0] * vh < 0.98 * size[1] * vw:
+            print(" bindingsite: this picture is narrower than the window, so its sides are cut off."
+                  "  `bindingsite_png file.png, %d, %d` frames the site for the picture." % size)
+    except Exception:
+        pass
+
+
+def _ray(width=0, height=0, antialias=-1, angle=0.0, shift=0.0, renderer=-1, quiet=1,
+         async_=0, _self=cmd, **kwargs):
+    stock = _STOCK["ray"]
+    size = _to_correct(width, height) if _self is cmd else None
+    if size is None:
+        return stock(width, height, antialias, angle, shift, renderer, quiet, async_,
+                     _self=_self, **kwargs)
+    kwargs.pop("async", None)           # the labels are put back once the picture is done
+    with _labels_for_picture(size[1]):
+        result = stock(width, height, antialias, angle, shift, renderer, quiet, 0,
+                       _self=_self, **kwargs)
+    _sides_cut(size, quiet)
+    return result
+
+
+def _png(filename, width=0, height=0, dpi=-1.0, ray=0, quiet=1, prior=0, format=0, *, _self=cmd):
+    stock = _STOCK["png"]
+    size = None
+    try:
+        # without OpenGL (pymol -c) PyMOL ray-traces every picture of a given size
+        traced = int(ray) or not any(cmd.get_renderer())
+        if _self is cmd and traced and int(prior) <= 0:
+            size = _to_correct(_pixels(width, dpi), _pixels(height, dpi))
+    except Exception:
+        size = None
+    if size is None:
+        return stock(filename, width, height, dpi, ray, quiet, prior, format, _self=_self)
+    with _labels_for_picture(size[1]):
+        result = stock(filename, width, height, dpi, ray, quiet, prior, format, _self=_self)
+    _sides_cut(size, quiet)
+    return result
+
+
+def _wrap_ray_and_png():
+    """Put the label correction around PyMOL's `ray` and `png`.
+
+    A PyMOL whose commands do not have the arguments known here is left as it is.
+    """
+    import inspect
+    known = {"ray": ["width", "height", "antialias", "angle", "shift", "renderer", "quiet",
+                     "async_", "_self", "kwargs"],
+             "png": ["filename", "width", "height", "dpi", "ray", "quiet", "prior", "format",
+                     "_self"]}
+    for name, wrapper in (("ray", _ray), ("png", _png)):
+        current = getattr(cmd, name, None)
+        stock = getattr(current, "_bindingsite_stock", current)    # the plugin may be loaded twice
+        try:
+            if list(inspect.signature(stock).parameters) != known[name]:
+                continue
+        except Exception:
+            continue
+        _STOCK[name] = stock
+        wrapper.__doc__ = stock.__doc__
+        wrapper._bindingsite_stock = stock
+        setattr(cmd, name, wrapper)
+        entry = cmd.keyword.get(name)
+        if entry and entry[0] in (stock, current):
+            entry[0] = wrapper
+
+
 def bindingsite_png(filename, width=2400, height=0, dpi=300, name="bs", transparent=0,
                     fit=1, quiet=0, _self=cmd):
     """
 DESCRIPTION
 
-    Ray-trace the current view to a PNG.  Unlike a plain `png`, labels keep
-    their on-screen proportions at any resolution and the frame is re-fitted
-    to the requested aspect ratio.
+    Ray-trace the current view to a PNG, with the frame re-fitted to the
+    aspect ratio of the picture.  A plain `ray` or `png` keeps the camera as
+    it is, so a picture narrower than the window loses its sides.  The
+    labels come out as on screen either way.
 
 USAGE
 
@@ -2915,27 +3085,12 @@ USAGE
     site = _SITES.get(name) if name + "_ligand" in cmd.get_names("selections") else None
     if site is not None and _truthy(fit):
         _fit(site, aspect=float(width) / float(height))
-    scale = float(height) / float(vh)
-    # Labels sized in Angstrom (negative label_size) are rasterised for the
-    # viewport, not for the ray-traced image; pixel-sized ones PyMOL scales itself.
-    touched = []
-    for obj in [""] + list(cmd.get_names("objects")):
-        try:
-            cur = float(cmd.get("label_size", obj)) if obj else float(cmd.get("label_size"))
-        except Exception:
-            continue
-        if cur >= 0 or (obj and abs(cur - float(cmd.get("label_size"))) < 1e-6):
-            continue
-        touched.append((obj, cur))
-    for obj, cur in touched:
-        _set("label_size", cur * scale, obj)
     old_bg = cmd.get("ray_opaque_background")
     cmd.set("ray_opaque_background", 0 if _truthy(transparent) else 1, quiet=1)
     try:
-        cmd.png(os.path.expanduser(filename), width=width, height=height, dpi=dpi, ray=1, quiet=1)
+        with _labels_for_picture(height, everything=True):
+            cmd.png(os.path.expanduser(filename), width=width, height=height, dpi=dpi, ray=1, quiet=1)
     finally:
-        for obj, cur in touched:
-            _set("label_size", cur, obj)
         cmd.set("ray_opaque_background", old_bg, quiet=1)
         cmd.set_view(view)              # the frame was fitted for the picture only
     _say(int(quiet), "wrote %s (%d x %d px)" % (filename, width, height))
@@ -2951,7 +3106,7 @@ def bindingsite_all(selection="enabled", align=1, quiet=0, _self=cmd, **kwargs):
 DESCRIPTION
 
     One binding-site view per loaded complex, all from the same camera, each
-    stored as a scene -- page through a ligand series with PgDn / PgUp.
+    stored as a scene.  Page through a ligand series with PgDn / PgUp.
 
 USAGE
 
@@ -3001,7 +3156,7 @@ USAGE
     _GALLERY["scenes"] = list(objs)
     _GALLERY["objs"] = list(objs)
     cmd.scene(objs[0], "recall", quiet=1)
-    _say(int(quiet), "%d scenes stored -- PgDn / PgUp to page through them" % len(objs))
+    _say(int(quiet), "%d scenes stored; PgDn / PgUp pages through them" % len(objs))
 
 
 def bindingsite_clear(name="", restore=1, _self=cmd):
@@ -3078,6 +3233,10 @@ USAGE
 for _fn in (bindingsite, bindingsite_ligands, bindingsite_report, bindingsite_relabel,
             bindingsite_view, bindingsite_png, bindingsite_all, bindingsite_clear, bindingsite_param):
     cmd.extend(_fn.__name__, _fn)
+try:
+    _wrap_ray_and_png()
+except Exception:                       # PyMOL's own commands then stay as they are
+    pass
 try:
     cmd.auto_arg[0]["bindingsite"] = cmd.auto_arg[0]["zoom"]
     cmd.auto_arg[1]["bindingsite"] = cmd.auto_arg[0]["zoom"]
@@ -3255,7 +3414,7 @@ def _build_dialog():
         text = _summary(site)
         n_clash = sum(1 for r in site["inter"] if r["type"] == "clash")
         if n_clash:
-            text += "  --  check this pose: the ligand clashes with the pocket"
+            text += ".  Check this pose: the ligand clashes with the pocket"
         status.setText(text)
 
     def save_png():

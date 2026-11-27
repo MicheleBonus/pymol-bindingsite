@@ -1,4 +1,4 @@
-# bindingsite — binding-site figures in one PyMOL command
+# bindingsite: binding-site figures in one PyMOL command
 
 [![tests](https://github.com/MicheleBonus/pymol-bindingsite/actions/workflows/tests.yml/badge.svg)](https://github.com/MicheleBonus/pymol-bindingsite/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -14,34 +14,33 @@ PyMOL> bindingsite
 
 ![Biotin in streptavidin (PDB 1STP), as drawn by a bare `bindingsite`](examples/1stp_biotin_streptavidin.png)
 
-It needs only PyMOL and numpy. No RDKit, no Open Babel, no PLIP, no hydrogens, no
-bond orders: the chemistry is perceived from the coordinates, so it works on
-crystal structures, co-folds (Boltz, AlphaFold 3, Chai) and docking poses alike.
+It needs only PyMOL and numpy, not RDKit, Open Babel or PLIP. The structure
+needs neither hydrogens nor bond orders, because the chemistry is perceived from
+the coordinates. Crystal structures, co-folds (Boltz, AlphaFold 3, Chai) and
+docking poses all work.
 
 ## Install
 
 The plugin is a single file, [`bindingsite.py`](bindingsite.py).
 
-**Plugin Manager, from the web:** *Plugin › Plugin Manager › Install New Plugin*,
+To install it from the web, open *Plugin › Plugin Manager › Install New Plugin*,
 paste this address into *Install from PyMOLWiki or any URL* and press *Fetch*:
 
 ```
 https://raw.githubusercontent.com/MicheleBonus/pymol-bindingsite/main/bindingsite.py
 ```
 
-**Plugin Manager, from a download:** the same tab, *Choose file…*, and pick
-`bindingsite.py`.
+To install a downloaded copy, use *Choose file…* on the same tab and pick
+`bindingsite.py`. Either way the commands are available after a restart, and the
+dialog sits under *Plugin › Binding Site*.
 
-Either way the commands are available after a restart, and the dialog sits under
-*Plugin › Binding Site*.
-
-**Without the Plugin Manager:** add one line to your `pymolrc`:
+Without the Plugin Manager, add one line to your `pymolrc`:
 
 ```
 run C:/path/to/bindingsite.py
 ```
 
-**For scripts:** `pip install git+https://github.com/MicheleBonus/pymol-bindingsite`
+For scripts, `pip install git+https://github.com/MicheleBonus/pymol-bindingsite`
 into the Python that has PyMOL makes `import bindingsite` work anywhere (see
 [Scripting](#scripting)).
 
@@ -65,15 +64,15 @@ bindingsite_clear                    # remove everything, restore your settings
 bindingsite_gui                      # the dialog (also Plugin › Binding Site)
 ```
 
-`help bindingsite` lists every option. The ones worth knowing:
+`help bindingsite` lists every option. The main ones:
 
 | option | what it does |
 |---|---|
-| `offset=27` or `offset="A:27,B:-21"` | adds a number to the residue numbers in labels and reports without renumbering the structure — e.g. to show precursor numbering on a mature-chain or construct model |
+| `offset=27` or `offset="A:27,B:-21"` | adds a number to the residue numbers in labels and reports without renumbering the structure, e.g. to show precursor numbering on a mature-chain or construct model |
 | `his_positive=1` | treats histidines of unknown protonation as cationic (lysosomal / acidic pH) |
 | `style=` | `publication` (white, thin outlines), `soft` (white, no outlines), `flat` (illustrative), `dark` |
 | `surface=` | `pocket` or `polar` (N blue, O red); only the part behind the ligand is shown |
-| `label_format=` | `{resn}{resi}` → Ser174, `{r}{resi}` → S174; also `{RESN}`, `{chain}` |
+| `label_format=` | `{resn}{resi}` gives Ser174, `{r}{resi}` gives S174; also `{RESN}`, `{chain}` |
 | `ligand_label=` | a name printed next to the ligand |
 | `ligand_color=` | any PyMOL colour for the ligand carbons |
 | `ligand_style=` | `sticks` or `ballstick` |
@@ -92,6 +91,24 @@ something of yours.
 
 Labels, the colour key and the cut-aways are laid out for the camera at the time
 of the call. Rotate freely, then `bindingsite_relabel`.
+
+### Saving a picture
+
+`bindingsite_png fig.png, 2400` ray-traces the view and frames the site for the
+shape of the picture, so nothing is cut off when the picture is narrower than
+the window. `transparent=1` gives a transparent background.
+
+PyMOL's own `ray 4000, 4000`, `png fig.png, 4000, 4000, ray=1` and the
+*Draw/Ray* button work as well. They keep the camera as it is, so a picture
+narrower than the window loses its sides.
+
+The labels are sized in Å, which keeps them in proportion when you zoom. PyMOL's
+ray-tracer enlarges labels sized in pixels for a picture larger than the window,
+but not labels sized in Å. On a 4000-pixel picture they would keep the pixel
+size they have on screen and be too small to read. The plugin therefore wraps
+`ray` and `png` and corrects the label size of its own objects while a picture
+is traced. Labels of other objects are left to PyMOL. So is `draw`, which sized
+the labels correctly when checked in PyMOL 3.1.
 
 ## Gallery
 
@@ -159,9 +176,9 @@ where the heavy atoms dictate (amide N–H along the bisector, hydroxyl and
 ammonium hydrogens turned towards the acceptor). Amines, amidines and guanidines
 are taken as protonated; carboxylates, phosphates, sulfonates and tetrazoles as
 deprotonated. If the file has explicit hydrogens, protonation and tautomers are
-taken from the file instead — unless the hydrogens were plainly added by filling
-valences (PyMOL's `h_add` leaves every lysine neutral and every Asp/Glu
-protonated), in which case they are ignored and the report says so.
+taken from the file instead. The exception is hydrogens that were plainly added
+by filling valences (PyMOL's `h_add` leaves every lysine neutral and every
+Asp/Glu protonated): those are ignored, and the report says so.
 
 Multi-state sessions work per object: a single-state receptor next to a
 multi-state set of docking poses is analysed for the pose on screen.
@@ -191,20 +208,22 @@ the picture at the top of this page:
    Lining the pocket without a specific contact (<= 4.0 A): Leu25, Val47, Gly48, Ala86
 ```
 
-## Things it will tell you rather than hide
+## What it warns about
 
-* **Clashes.** A pose that overlaps the pocket is drawn with red clash marks and
-  the report says so. A pretty picture of a bad pose is worse than no picture.
-* **Bonds PyMOL invented.** When a file has no bond records for a ligand, PyMOL
-  bonds by distance and will happily tie a ligand to a nearby side chain. Bonds
-  with an implausible length are removed and reported.
-* **Mis-read coordinates.** A ligand sitting on top of protein atoms usually means
-  a malformed file (typically a PDB with a 4-letter residue name, which shifts the
-  coordinate columns). The report says so and points to the mmCIF.
-* **Warheads that are not in attack geometry.** For carbamates, esters, nitriles,
-  Michael acceptors, boronic acids, phosph(on)ates and the like, the distance and
-  Bürgi–Dunitz angle to the nearest nucleophile are reported even when they are
-  off — that is what tells a Michaelis-like pose from a merely nearby one.
+* A pose that overlaps the pocket gets red clash marks in the picture and a
+  warning in the report. Without them the figure would make a bad pose look
+  acceptable.
+* When a file has no bond records for a ligand, PyMOL bonds by distance and can
+  tie the ligand to a nearby side chain. Bonds with an implausible length are
+  removed and reported.
+* A ligand sitting on top of protein atoms usually means a malformed file,
+  typically a PDB with a 4-letter residue name, which shifts the coordinate
+  columns. The report says so and points to the mmCIF.
+* For carbamates, esters, nitriles, Michael acceptors, boronic acids,
+  phosph(on)ates and similar warheads, the report gives the distance and the
+  Bürgi–Dunitz angle to the nearest nucleophile even when they are outside the
+  attack window. Those two numbers separate a Michaelis-like pose from one that
+  is merely close.
 
 ## Scripting
 
@@ -250,20 +269,21 @@ be among those found:
 
 | PDB | complex | must be found |
 |---|---|---|
-| 1STP | biotin – streptavidin | H-bonds to Asn23, Ser27, Tyr43, Ser45, Asn49, Ser88, Asp128 |
-| 3HS4 | acetazolamide – carbonic anhydrase II | zinc coordination by the sulfonamide and His94, His96, His119; H-bond to Thr199 |
-| 3ERT | 4-hydroxytamoxifen – oestrogen receptor α | H-bonds to Glu353 and Arg394, salt bridge to Asp351 |
-| 1P5E | tetrabromobenzotriazole – CDK2 | halogen bond to Leu83 |
-| 1ACJ | tacrine – acetylcholinesterase | π-stacking with Trp84 and Phe330, H-bond to His440 |
-| 4DFR | methotrexate – dihydrofolate reductase | H-bonds to Asp27, Ile5, Ile94; salt bridge to Arg57 |
-| 1K8Q | alkyl phosphonate – dog gastric lipase | covalent bond to Ser153; H-bonds to Leu67 and Gln154 |
-| 6LU7 | N3 – SARS-CoV-2 main protease | covalent bond to Cys145; H-bonds to Glu166, His163, Gly143 |
-| 1HSG | indinavir – HIV-1 protease | H-bond to Asp25, water bridge to Ile50 |
-| 1YCR | p53 peptide – MDM2 | H-bonds to Leu54 and Gln72 |
+| 1STP | biotin in streptavidin | H-bonds to Asn23, Ser27, Tyr43, Ser45, Asn49, Ser88, Asp128 |
+| 3HS4 | acetazolamide in carbonic anhydrase II | zinc coordination by the sulfonamide and His94, His96, His119; H-bond to Thr199 |
+| 3ERT | 4-hydroxytamoxifen in oestrogen receptor α | H-bonds to Glu353 and Arg394, salt bridge to Asp351 |
+| 1P5E | tetrabromobenzotriazole in CDK2 | halogen bond to Leu83 |
+| 1ACJ | tacrine in acetylcholinesterase | π-stacking with Trp84 and Phe330, H-bond to His440 |
+| 4DFR | methotrexate in dihydrofolate reductase | H-bonds to Asp27, Ile5, Ile94; salt bridge to Arg57 |
+| 1K8Q | alkyl phosphonate on dog gastric lipase | covalent bond to Ser153; H-bonds to Leu67 and Gln154 |
+| 6LU7 | N3 in SARS-CoV-2 main protease | covalent bond to Cys145; H-bonds to Glu166, His163, Gly143 |
+| 1HSG | indinavir in HIV-1 protease | H-bond to Asp25, water bridge to Ile50 |
+| 1YCR | p53 peptide on MDM2 | H-bonds to Leu54 and Gln72 |
 
 `tests/` holds these checks and a set of edge cases (multi-state docking
 sessions, chain breaks, valence-filled hydrogens, quoted prompt arguments, names
-that must never be deleted, clean-up, the dialog). The ten entries are kept in
+that must never be deleted, clean-up, labels in pictures larger than the window,
+the dialog). The ten entries are kept in
 `tests/pdb_cache/`, so the tests run offline. Run them with the Python that has
 PyMOL, with or without pytest:
 

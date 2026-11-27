@@ -1,6 +1,7 @@
 """Edge cases, each pinned after it went wrong once: names that must never be deleted,
 per-object states, duplicate bonds, chain breaks, valence-filled hydrogens, quoted
-prompt arguments, clean-up, alternate locations, the dialog.
+prompt arguments, clean-up, alternate locations, labels in pictures larger than the
+window, the dialog.
 
     python -m pytest tests/test_edge_cases.py
     python tests/test_edge_cases.py
@@ -11,7 +12,8 @@ import sys
 from pymol import cmd, CmdException
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _helpers import OUT, bs, case, check, found, fresh, labels, main, pdb, skip  # noqa: E402
+from _helpers import (OUT, bs, case, check, differing, found, fresh, labels, main, pdb,  # noqa: E402
+                      pixels, skip)
 
 
 def two_complexes(first, second):
@@ -317,6 +319,93 @@ def test_his_positive():
     C, atoms = site["chem"], site["atoms"]
     his_n = [a.i for a in atoms if a.resn == "HIS" and a.name in ("ND1", "NE2")]
     check("his_positive: imidazolium N are donors only", bool(his_n) and not any(i in C.acceptors for i in his_n))
+
+
+# ---- pictures larger than the window -----------------------------------------------------------
+@case
+def test_plain_ray_and_png_keep_the_labels():
+    """`ray 4000,4000` shrank the labels to specks: PyMOL's ray-tracer enlarges labels sized
+    in pixels for a larger picture, but not those sized in Angstrom."""
+    cmd.viewport(320, 240)
+    pdb("1stp")
+    bs.bindingsite(quiet=1, distances=1)
+    W, H = 640, 480                                     # twice the window
+
+    def sizes():
+        return sorted((o, cmd.get("label_size", o)) for o in cmd.get_names("objects")
+                      if float(cmd.get("label_size", o)) < 0)
+
+    def path(tag):
+        return os.path.join(OUT, "ray_%s.png" % tag).replace("\\", "/")
+
+    before = sizes()
+    check("the scene has labels sized in Angstrom", {"bs.labels", "bs.hbond"} <= {o for o, _ in before})
+    # the reference is the plugin's own command with the camera left alone; the first
+    # picture of a session is discarded, its distance labels sit a few pixels off
+    bs.bindingsite_png(path("first"), W, H, dpi=150, fit=0, quiet=1)
+    bs.bindingsite_png(path("reference"), W, H, dpi=150, fit=0, quiet=1)
+    reference = pixels(path("reference"))
+    check("reference picture is %d x %d" % (W, H), reference.shape[:2] == (H, W))
+
+    def off(tag, make, save=True):
+        """Share of the pixels in which the picture `make` produces differs from the reference."""
+        make()
+        if save:
+            cmd.png(path(tag), dpi=150)                 # the picture `ray` left in the window
+        return differing(reference, pixels(path(tag)))
+
+    wrapped = [
+        ("`ray W, H` typed at the prompt", off("prompt", lambda: cmd.do("ray %d, %d" % (W, H)))),
+        ("cmd.ray(W, H)", off("api", lambda: cmd.ray(W, H))),
+        ("`ray W` (height follows the window)", off("width", lambda: cmd.do("ray %d" % W))),
+        ("the Draw/Ray button (`ray W, H, async=1`)",
+         off("button", lambda: cmd.do("ray %d, %d, async=1" % (W, H)))),
+        ("cmd.png(file, W, H, ray=1)",
+         off("png", lambda: cmd.png(path("png"), W, H, dpi=150, ray=1), save=False)),
+        ("`png file, W, H` without OpenGL",
+         off("sized", lambda: cmd.do("png %s, %d, %d, dpi=150" % (path("sized"), W, H)), save=False)),
+        ("cmd.png(file, '10.84cm', dpi=150, ray=1)",
+         off("cm", lambda: cmd.png(path("cm"), "10.84cm", dpi=150, ray=1), save=False)),
+    ]
+    for what, share in wrapped:
+        check("%s: labels as in bindingsite_png" % what, share < 0.003, "(%.2f %% of pixels differ)" % (100 * share))
+    check("label sizes are put back", sizes() == before, str(sizes()))
+
+    # PyMOL's own ray, unwrapped: if this ever matches, PyMOL has changed and the
+    # correction would enlarge the labels twice
+    stock = off("stock", lambda: bs._STOCK["ray"](W, H))
+    check("PyMOL's own ray still shrinks them", stock > 0.01, "(%.2f %% of pixels differ)" % (100 * stock))
+
+    # a picture of the size of the window, and a session without a binding site: nothing to do
+    check("the size of the window needs no correction", bs._to_correct(0, 0) is None and bs._to_correct(320, 240) is None)
+    fresh()
+    cmd.viewport(320, 240)
+    pdb("1stp")
+    cmd.hide("everything")
+    cmd.show("sticks", "resn BTN")
+    cmd.label("resn BTN and name S1", "'biotin'")
+    cmd.set("label_size", -1.5, "cplx")
+    cmd.orient("resn BTN")
+    check("labels of other objects are left to PyMOL", bs._to_correct(W, H) is None)
+    cmd.ray(W, H)
+    cmd.png(path("theirs"), dpi=150)
+    bs._STOCK["ray"](W, H)
+    cmd.png(path("theirs_stock"), dpi=150)
+    share = differing(pixels(path("theirs")), pixels(path("theirs_stock")))
+    check("... so their picture is PyMOL's own", share < 0.001, "(%.2f %% of pixels differ)" % (100 * share))
+
+
+@case
+def test_ray_and_png_are_wrapped_once():
+    """Running the plugin file again must wrap PyMOL's commands, not its own wrappers."""
+    check("ray and png go through the plugin", cmd.ray is bs._ray and cmd.png is bs._png
+          and cmd.keyword["ray"][0] is bs._ray and cmd.keyword["png"][0] is bs._png)
+    check("their help is PyMOL's", "ray" in (cmd.ray.__doc__ or "") and "PNG" in (cmd.png.__doc__ or ""))
+    stock = dict(bs._STOCK)
+    check("PyMOL's own commands are kept", stock["ray"] is not bs._ray and stock["png"] is not bs._png)
+    bs._wrap_ray_and_png()
+    check("wrapping a second time finds them again",
+          bs._STOCK["ray"] is stock["ray"] and bs._STOCK["png"] is stock["png"] and cmd.ray is bs._ray)
 
 
 # ---- the dialog -----------------------------------------------------------------------------------------

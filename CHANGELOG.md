@@ -1,6 +1,19 @@
 # Changelog
 
-## 1.0.0 — 2026-11-27
+## 1.0.1 - 2026-11-27
+
+- Fixed: in a picture ray-traced larger than the window with PyMOL's own `ray`
+  or `png` (for example `ray 4000, 4000`), the residue and distance labels kept
+  their on-screen size in pixels and were too small to read. PyMOL's ray-tracer enlarges labels sized in pixels for a
+  larger picture but not labels sized in Å, which the plugin uses. `ray` and
+  `png` are now wrapped, and the label size of binding-site objects is corrected
+  while a picture is traced. `bindingsite_png` did this already.
+- When labels have to be corrected, `ray ..., async=1` (the *Draw/Ray* button)
+  runs synchronously.
+- A plain `ray` or `png` narrower than the window prints a hint that the sides
+  are cut off and that `bindingsite_png` frames the site for the picture.
+
+## 1.0.0 - 2026-11-27
 
 First public release.
 
