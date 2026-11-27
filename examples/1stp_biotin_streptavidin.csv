@@ -1,0 +1,13 @@
+type,residue,chain,res_atom,lig_atom,dist,angle,note,drawn
+Hydrogen bond,Asn23,A,ND2,O3,2.99,151,protein donates,True
+Hydrogen bond,Ser27,A,OG,O3,2.77,151,protein donates,True
+Hydrogen bond,Tyr43,A,OH,O3,2.58,169,protein donates,True
+Hydrogen bond,Ser45,A,OG,N2,3.04,163,ligand donates,True
+Hydrogen bond,Asn49,A,N,O12,2.95,153,"protein donates, backbone",True
+Hydrogen bond,Ser88,A,OG,O11,2.69,159,protein donates,True
+Hydrogen bond,Asp128,A,OD2,N1,2.78,171,ligand donates,True
+Hydrophobic contact,Trp79,A,CZ2,C8,3.42,,,True
+Hydrophobic contact,Thr90,A,CG2,S1,3.74,,,True
+Hydrophobic contact,Trp92,A,CZ2,S1,3.76,,,True
+Hydrophobic contact,Trp108,A,CD2,C6,3.47,,,True
+Hydrophobic contact,Leu110,A,CD2,C9,3.84,,,True

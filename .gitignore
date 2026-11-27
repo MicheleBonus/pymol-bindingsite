@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+build/
+dist/
+*.egg-info/
+
+# PyMOL
+*.pse
+.pymol_history
+
+# editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+[Dd]esktop.ini
+
+# file-sync clients (Nextcloud / ownCloud)
+.sync_*.db*
+._sync_*.db*
+.owncloudsync.log*
+*conflicted copy*

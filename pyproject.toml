@@ -1,0 +1,41 @@
+# The plugin is the single file bindingsite.py; PyMOL's Plugin Manager needs nothing
+# else.  This file only makes `pip install .` work, so that scripts can
+# `import bindingsite` in the Python that has PyMOL.
+
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pymol-bindingsite"
+dynamic = ["version"]
+description = "Binding-site figures in one PyMOL command: interactions, labels, camera"
+readme = "README.md"
+requires-python = ">=3.7"
+license = { text = "MIT" }
+authors = [{ name = "Michele Bonus" }]
+keywords = ["PyMOL", "plugin", "protein-ligand interactions", "binding site", "molecular visualization"]
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+# PyMOL itself is not on this list: install it with conda (pymol-open-source)
+# or use the Python of an Incentive PyMOL installation.
+dependencies = ["numpy"]
+
+[project.urls]
+Homepage = "https://github.com/MicheleBonus/pymol-bindingsite"
+Issues = "https://github.com/MicheleBonus/pymol-bindingsite/issues"
+Changelog = "https://github.com/MicheleBonus/pymol-bindingsite/blob/main/CHANGELOG.md"
+
+[tool.setuptools]
+py-modules = ["bindingsite"]
+
+[tool.setuptools.dynamic]
+version = { attr = "bindingsite.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

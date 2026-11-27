@@ -1,0 +1,67 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: PyMOL ${{ matrix.pymol }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, pymol: "3.1", python: "3.12" }
+          - { os: ubuntu-latest, pymol: "2.5", python: "3.10" }
+          - { os: windows-latest, pymol: "3.1", python: "3.12" }
+          - { os: macos-latest, pymol: "3.1", python: "3.12" }
+    defaults:
+      run:
+        shell: bash -el {0}
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: mamba-org/setup-micromamba@v3
+        with:
+          environment-name: pymol
+          create-args: >-
+            python=${{ matrix.python }}
+            pymol-open-source=${{ matrix.pymol }}
+            numpy
+            pytest
+          condarc: |
+            channels:
+              - conda-forge
+            channel_priority: strict
+
+      - name: Versions
+        run: |
+          python -c "import sys, numpy; from pymol import cmd; print(sys.version); print('PyMOL', cmd.get_version()[0]); print('numpy', numpy.__version__)"
+
+      - name: Tests
+        run: python -m pytest tests -v
+
+      - name: The tests also run without pytest
+        run: |
+          python tests/test_reference_complexes.py
+          python tests/test_edge_cases.py
+
+      - name: Example figure
+        run: python examples/make_examples.py 1stp
+
+      - name: pip install
+        run: |
+          python -m pip install --no-deps .
+          cd examples && python -c "import bindingsite; print(bindingsite.__file__, bindingsite.__version__)"

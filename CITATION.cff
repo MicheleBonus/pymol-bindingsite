@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+message: "If you use bindingsite for a figure or an analysis, please cite it as below."
+title: "bindingsite: binding-site figures in one PyMOL command"
+abstract: >-
+  A PyMOL plugin that turns a protein-ligand complex into a finished
+  binding-site view: ligand, pocket residues, colour-coded non-covalent and
+  covalent interactions perceived from heavy-atom geometry, residue labels that
+  do not overlap, a colour key and an automatically chosen camera.
+type: software
+authors:
+  - family-names: Bonus
+    given-names: Michele
+    affiliation: "Heinrich Heine University Düsseldorf"
+version: 1.0.0
+date-released: "2026-11-27"
+license: MIT
+repository-code: "https://github.com/MicheleBonus/pymol-bindingsite"
+url: "https://github.com/MicheleBonus/pymol-bindingsite"
+keywords:
+  - PyMOL
+  - plugin
+  - protein-ligand interactions
+  - binding site
+  - molecular visualization
+  - structure-based drug design

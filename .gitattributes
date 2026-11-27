@@ -1,0 +1,6 @@
+* text=auto eol=lf
+
+*.png binary
+
+# PDB entries kept for the tests: stored byte for byte, out of diffs and language statistics
+tests/pdb_cache/*.cif -text -diff linguist-vendored
